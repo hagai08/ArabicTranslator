@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Language Translation Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+        }
+        textarea {
+            resize: none;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 text-center mb-6">Translation Agent</h1>
+        <p class="text-center text-gray-600 mb-6">Enter Arabic text and translate it to English or Hebrew, with a word-by-word breakdown.</p>
+        
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <label for="arabicText" class="block text-sm font-medium text-gray-700">Arabic Text</label>
+                <div class="flex space-x-2">
+                    <button id="delargeBtn" class="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" title="Decrease font size">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                        </svg>
+                    </button>
+                    <button id="enlargeBtn" class="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" title="Increase font size">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                    <!-- New button for reading the Arabic text -->
+                    <button id="readArabicBtn" class="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" title="Read Arabic text aloud">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 1a9 9 0 0 0-9 9v3a1 1 0 0 0 2 0v-3a7 7 0 0 1 14 0v3a1 1 0 0 0 2 0v-3a9 9 0 0 0-9-9z"/>
+                            <path d="M12 17a3 3 0 1 0 3 3a3 3 0 0 0-3-3z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <textarea id="arabicText" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-right" dir="rtl" placeholder="أدخل النص العربي هنا..."></textarea>
+        </div>
+
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="translateEnglishBtn" class="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-lg hover:bg-blue-700 transition-colors">
+                Translate to English
+            </button>
+            <button id="translateHebrewBtn" class="flex-1 px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-lg hover:bg-blue-700 transition-colors">
+                Translate to Hebrew
+            </button>
+        </div>
+
+        <div id="loading" class="hidden flex justify-center items-center py-4">
+            <div class="spinner"></div>
+            <span class="ml-2 text-gray-500">Translating using Gemini API...</span>
+        </div>
+
+        <div id="results" class="space-y-6">
+            <div id="fullTranslationSection" class="p-4 bg-gray-100 rounded-lg" dir="rtl">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xl font-semibold text-gray-800 text-right">תרגום</h2>
+                    <button id="copyTranslationBtn" class="flex items-center space-x-1 px-3 py-1 bg-gray-500 text-white text-sm font-semibold rounded-full shadow-md hover:bg-gray-600 transition-colors">
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <p id="fullTranslation" class="text-gray-700 text-lg">Your translation will appear here.</p>
+            </div>
+            
+            <div id="wordByWordSection" class="p-4 bg-gray-100 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Word-by-Word</h2>
+                <div id="wordByWord" class="flex flex-wrap gap-2 text-sm text-gray-700">
+                    <span class="text-gray-500 italic">Word-by-word translation will appear here.</span>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        const API_KEY = "";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        
+        const arabicTextarea = document.getElementById('arabicText');
+        const translateEnglishBtn = document.getElementById('translateEnglishBtn');
+        const translateHebrewBtn = document.getElementById('translateHebrewBtn');
+        const copyTranslationBtn = document.getElementById('copyTranslationBtn');
+        const loadingDiv = document.getElementById('loading');
+        const fullTranslationParagraph = document.getElementById('fullTranslation');
+        const fullTranslationSection = document.getElementById('fullTranslationSection');
+        const wordByWordDiv = document.getElementById('wordByWord');
+        const wordByWordSection = document.getElementById('wordByWordSection');
+        const enlargeBtn = document.getElementById('enlargeBtn');
+        const delargeBtn = document.getElementById('delargeBtn');
+        const readArabicBtn = document.getElementById('readArabicBtn');
+
+        let currentFontSize = 24; // Initial font size in pixels
+        const FONT_SIZE_INCREMENT = 2;
+        const MIN_FONT_SIZE = 14;
+        const MAX_FONT_SIZE = 36;
+        
+        // Set the initial font size on the textarea
+        arabicTextarea.style.fontSize = `${currentFontSize}px`;
+
+        async function callGeminiApi(payload) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    return candidate.content.parts[0].text;
+                } else {
+                    throw new Error('No content returned from API.');
+                }
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                throw error;
+            }
+        }
+
+        async function translate(text, targetLanguage) {
+            loadingDiv.classList.remove('hidden');
+            fullTranslationParagraph.textContent = '';
+            wordByWordDiv.innerHTML = '<span class="text-gray-500 italic">Word-by-word translation will appear here.</span>';
+
+            // Reset direction attributes
+            fullTranslationParagraph.classList.remove('text-right', 'text-left');
+            wordByWordSection.setAttribute('dir', 'auto');
+            wordByWordDiv.setAttribute('dir', 'auto');
+            
+            // Set direction based on target language
+            if (targetLanguage === 'Hebrew' || targetLanguage === 'Arabic') {
+                fullTranslationParagraph.classList.add('text-right');
+                wordByWordSection.setAttribute('dir', 'rtl');
+                wordByWordDiv.setAttribute('dir', 'rtl');
+            } else {
+                fullTranslationParagraph.classList.add('text-left');
+                wordByWordSection.setAttribute('dir', 'ltr');
+                wordByWordDiv.setAttribute('dir', 'ltr');
+            }
+            
+            const fullTranslationPrompt = `Translate the following Arabic text to ${targetLanguage} and provide only the translated text, with no additional commentary or phrases: ${text}`;
+            const wordByWordPrompt = `Provide a word-by-word translation of the following Arabic text to ${targetLanguage} in JSON format. The JSON should be an array of objects, where each object has "arabicWord" and "translatedWord" properties.
+            
+            Arabic Text: ${text}`;
+
+            try {
+                // Full translation
+                const fullPayload = {
+                    contents: [{ parts: [{ text: fullTranslationPrompt }] }]
+                };
+                const fullTranslatedText = await callGeminiApi(fullPayload);
+                fullTranslationParagraph.textContent = fullTranslatedText;
+
+                // Word-by-word translation
+                const wordByWordPayload = {
+                    contents: [{ parts: [{ text: wordByWordPrompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    "arabicWord": { "type": "STRING" },
+                                    "translatedWord": { "type": "STRING" }
+                                },
+                                "propertyOrdering": ["arabicWord", "translatedWord"]
+                            }
+                        }
+                    }
+                };
+                const wordByWordResponse = await callGeminiApi(wordByWordPayload);
+                let wordTranslations = JSON.parse(wordByWordResponse);
+
+                wordByWordDiv.innerHTML = ''; // Clear previous content
+                wordTranslations.forEach(word => {
+                    const span = document.createElement('span');
+                    span.className = 'bg-gray-200 rounded-md px-2 py-1 flex flex-col text-center';
+                    span.innerHTML = `
+                        <span class="text-sm font-bold">${word.arabicWord}</span>
+                        <span class="text-xs text-gray-600">${word.translatedWord}</span>
+                    `;
+                    wordByWordDiv.appendChild(span);
+                });
+
+            } catch (error) {
+                fullTranslationParagraph.textContent = 'An error occurred during translation. Please try again.';
+                wordByWordDiv.innerHTML = '<span class="text-red-500">Error: Could not retrieve word-by-word translation.</span>';
+            } finally {
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        copyTranslationBtn.addEventListener('click', () => {
+            const textToCopy = fullTranslationParagraph.textContent;
+            if (textToCopy && textToCopy !== "Your translation will appear here.") {
+                // Use a temporary textarea to hold the text for copying
+                const tempTextarea = document.createElement('textarea');
+                tempTextarea.value = textToCopy;
+                document.body.appendChild(tempTextarea);
+                tempTextarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextarea);
+
+                // Provide feedback to the user
+                copyTranslationBtn.innerHTML = '<span>Copied</span>';
+                setTimeout(() => {
+                    copyTranslationBtn.innerHTML = '<span>Copy</span>';
+                }, 2000);
+            }
+        });
+        
+        // New event listeners for font size controls
+        enlargeBtn.addEventListener('click', () => {
+            if (currentFontSize < MAX_FONT_SIZE) {
+                currentFontSize += FONT_SIZE_INCREMENT;
+                arabicTextarea.style.fontSize = `${currentFontSize}px`;
+            }
+        });
+
+        delargeBtn.addEventListener('click', () => {
+            if (currentFontSize > MIN_FONT_SIZE) {
+                currentFontSize -= FONT_SIZE_INCREMENT;
+                arabicTextarea.style.fontSize = `${currentFontSize}px`;
+            }
+        });
+
+        readArabicBtn.addEventListener('click', () => {
+            const text = arabicTextarea.value.trim();
+            if (text && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Stop any pending speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ar-SA';
+                utterance.rate = 0.9; 
+                window.speechSynthesis.speak(utterance);
+            } else {
+                console.error("Browser does not support the Web Speech API.");
+                // You could also add a message box here to alert the user
+            }
+        });
+
+        translateEnglishBtn.addEventListener('click', () => {
+            const text = arabicTextarea.value.trim();
+            if (text) {
+                translate(text, 'English');
+            } else {
+                fullTranslationParagraph.textContent = "Please enter some Arabic text to translate.";
+            }
+        });
+        
+        translateHebrewBtn.addEventListener('click', () => {
+            const text = arabicTextarea.value.trim();
+            if (text) {
+                translate(text, 'Hebrew');
+            } else {
+                fullTranslationParagraph.textContent = "Please enter some Arabic text to translate.";
+            }
+        });
+
+    </script>
+</body>
+</html>
