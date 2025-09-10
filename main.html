@@ -39,6 +39,44 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .audio-player-container {
+            display: flex;
+            align-items: center;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            padding: 0.5rem 1rem;
+            gap: 1rem;
+        }
+        .play-pause-btn {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            color: white;
+            transition-property: background-color;
+            transition-duration: 150ms;
+        }
+        .progress-bar {
+            flex-grow: 1;
+            height: 0.5rem;
+            background-color: #d1d5db;
+            border-radius: 9999px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #2563eb;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        .time-display {
+            font-size: 0.875rem;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -86,6 +124,25 @@
             <span class="ml-2 text-gray-500">Translating using Gemini API...</span>
         </div>
 
+        <div id="audioPlayerSection" class="hidden my-4">
+            <div class="audio-player-container">
+                <button id="playPauseBtn" class="play-pause-btn">
+                    <svg id="playIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd" d="M4.5 5.653c0-1.081 1.154-1.749 2.046-1.223l11.085 6.402c.9.523.9 1.488 0 2.011L6.546 19.57c-.892.523-2.046-.148-2.046-1.223V5.653z" clip-rule="evenodd" />
+                    </svg>
+                    <svg id="pauseIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 hidden">
+                        <path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zM14.25 5.25a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75V5.25z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div id="progressBar" class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div class="time-display">
+                    <span id="currentTime">0:00</span> / <span id="durationTime">0:00</span>
+                </div>
+            </div>
+        </div>
+
         <div id="results" class="space-y-6">
             <div id="fullTranslationSection" class="p-4 bg-gray-100 rounded-lg" dir="rtl">
                 <div class="flex items-center justify-between mb-2">
@@ -110,6 +167,7 @@
     <script>
         const API_KEY = "";
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`;
         
         const arabicTextarea = document.getElementById('arabicText');
         const translateEnglishBtn = document.getElementById('translateEnglishBtn');
@@ -123,11 +181,20 @@
         const enlargeBtn = document.getElementById('enlargeBtn');
         const delargeBtn = document.getElementById('delargeBtn');
         const readArabicBtn = document.getElementById('readArabicBtn');
+        const audioPlayerSection = document.getElementById('audioPlayerSection');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const currentTimeSpan = document.getElementById('currentTime');
+        const durationTimeSpan = document.getElementById('durationTime');
 
         let currentFontSize = 24; // Initial font size in pixels
         const FONT_SIZE_INCREMENT = 2;
         const MIN_FONT_SIZE = 14;
         const MAX_FONT_SIZE = 36;
+        let audio = null;
         
         // Set the initial font size on the textarea
         arabicTextarea.style.fontSize = `${currentFontSize}px`;
@@ -232,6 +299,64 @@
             }
         }
 
+        // Helper functions for TTS audio conversion
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+
+            const buffer = new ArrayBuffer(44 + pcmData.byteLength);
+            const view = new DataView(buffer);
+
+            // RIFF header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcmData.byteLength, true);
+            writeString(view, 8, 'WAVE');
+
+            // fmt chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+
+            // data chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcmData.byteLength, true);
+
+            // Write PCM data
+            new Uint8Array(buffer, 44).set(new Uint8Array(pcmData));
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        // Helper to format time
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+        
         copyTranslationBtn.addEventListener('click', () => {
             const textToCopy = fullTranslationParagraph.textContent;
             if (textToCopy && textToCopy !== "Your translation will appear here.") {
@@ -266,17 +391,119 @@
             }
         });
 
-        readArabicBtn.addEventListener('click', () => {
+        readArabicBtn.addEventListener('click', async () => {
             const text = arabicTextarea.value.trim();
-            if (text && 'speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Stop any pending speech
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'ar-SA';
-                utterance.rate = 0.9; 
-                window.speechSynthesis.speak(utterance);
-            } else {
-                console.error("Browser does not support the Web Speech API.");
-                // You could also add a message box here to alert the user
+            if (!text) {
+                fullTranslationParagraph.textContent = "Please enter some Arabic text to read aloud.";
+                return;
+            }
+
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+            audioPlayerSection.classList.add('hidden');
+
+            const originalLoadingText = document.querySelector("#loading span").textContent;
+            loadingDiv.classList.remove('hidden');
+            document.querySelector("#loading span").textContent = "Generating audio...";
+
+            try {
+                const ttsPayload = {
+                    contents: [{ parts: [{ text: text }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: "Kore" }
+                            }
+                        }
+                    }
+                };
+
+                const response = await fetch(TTS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ttsPayload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`TTS API call failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000;
+                    
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const wavBlob = pcmToWav(pcmData, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    audio = new Audio(audioUrl);
+                    
+                    // Show audio player and start playback
+                    audioPlayerSection.classList.remove('hidden');
+                    audio.play();
+                    
+                    // Set up event listeners for the audio player
+                    audio.addEventListener('loadedmetadata', () => {
+                        durationTimeSpan.textContent = formatTime(audio.duration);
+                    });
+
+                    audio.addEventListener('timeupdate', () => {
+                        const progressPercentage = (audio.currentTime / audio.duration) * 100;
+                        progressFill.style.width = `${progressPercentage}%`;
+                        currentTimeSpan.textContent = formatTime(audio.currentTime);
+                    });
+
+                    audio.addEventListener('play', () => {
+                        playIcon.classList.add('hidden');
+                        pauseIcon.classList.remove('hidden');
+                    });
+                    
+                    audio.addEventListener('pause', () => {
+                        playIcon.classList.remove('hidden');
+                        pauseIcon.classList.add('hidden');
+                    });
+                    
+                    audio.addEventListener('ended', () => {
+                        playIcon.classList.remove('hidden');
+                        pauseIcon.classList.add('hidden');
+                        audio.currentTime = 0;
+                        URL.revokeObjectURL(audioUrl); // Clean up the object URL
+                    });
+
+                    progressBar.addEventListener('click', (e) => {
+                        const progressBarWidth = progressBar.clientWidth;
+                        const clickX = e.offsetX;
+                        const duration = audio.duration;
+                        const newTime = (clickX / progressBarWidth) * duration;
+                        audio.currentTime = newTime;
+                    });
+                } else {
+                    throw new Error("Invalid or missing audio data in API response.");
+                }
+            } catch (error) {
+                console.error("Error generating or playing audio:", error);
+                fullTranslationParagraph.textContent = "An error occurred while generating audio. Please try again.";
+            } finally {
+                loadingDiv.classList.add('hidden');
+                document.querySelector("#loading span").textContent = originalLoadingText;
+            }
+        });
+
+        playPauseBtn.addEventListener('click', () => {
+            if (audio) {
+                if (audio.paused) {
+                    audio.play();
+                } else {
+                    audio.pause();
+                }
             }
         });
 
@@ -297,7 +524,6 @@
                 fullTranslationParagraph.textContent = "Please enter some Arabic text to translate.";
             }
         });
-
     </script>
 </body>
 </html>
