@@ -77,6 +77,13 @@
             font-size: 0.875rem;
             white-space: nowrap;
         }
+        .api-key-input {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -98,11 +105,17 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
                     </button>
-                    <!-- New button for reading the Arabic text -->
+                    <!-- Button for reading the Arabic text -->
                     <button id="readArabicBtn" class="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" title="Read Arabic text aloud">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 1a9 9 0 0 0-9 9v3a1 1 0 0 0 2 0v-3a7 7 0 0 1 14 0v3a1 1 0 0 0 2 0v-3a9 9 0 0 0-9-9z"/>
                             <path d="M12 17a3 3 0 1 0 3 3a3 3 0 0 0-3-3z"/>
+                        </svg>
+                    </button>
+                    <!-- Button to clear the Arabic text -->
+                    <button id="clearArabicTextBtn" class="p-1 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors" title="Clear text">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
@@ -123,6 +136,7 @@
             <div class="spinner"></div>
             <span class="ml-2 text-gray-500">Translating using Gemini API...</span>
         </div>
+        <div id="statusMessage" class="text-center text-sm text-red-500 mb-4 hidden"></div>
 
         <div id="audioPlayerSection" class="hidden my-4">
             <div class="audio-player-container">
@@ -162,13 +176,36 @@
             </div>
         </div>
         
+        <!-- Existing transliteration section, which is separate from the word-by-word view -->
+        <div class="mt-8">
+            <h2 id="transliterationTitle" class="text-2xl font-bold text-gray-800 text-center mb-4 cursor-pointer hover:text-blue-600 transition-colors">תעתיק</h2>
+            <div class="mb-4">
+                <label for="arabicTransliterationText" class="block text-sm font-medium text-gray-700">Arabic Text for Transliteration</label>
+                <textarea id="arabicTransliterationText" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-right" dir="rtl" placeholder="أدخل النص العربي للتعتيق هنا..."></textarea>
+            </div>
+            <button id="transliterateBtn" class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-full shadow-lg hover:bg-blue-700 transition-colors mb-4">
+                תרגם לתעתיק
+            </button>
+            <div id="transliterationResult" class="p-4 bg-gray-100 rounded-lg text-right text-lg text-gray-700" dir="rtl">
+                התעתיק יופיע כאן.
+            </div>
+            <div id="transliterationMap" class="hidden mt-4 bg-gray-100 p-4 rounded-lg">
+                <h3 class="text-xl font-semibold mb-2 text-gray-800">Transliteration Map (ערבית ↔ עברית)</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-gray-700">
+                    <!-- Map will be populated here -->
+                </div>
+                <p class="text-center text-sm text-gray-500 mt-4">
+                    <a href="https://he.wikipedia.org/wiki/%D7%AA%D7%A2%D7%AA%D7%99%D7%A7_%D7%9E%D7%A2%D7%A8%D7%91%D7%99%D7%AA_%D7%9C%D7%A2%D7%91%D7%A8%D7%99%D7%AA" target="_blank" class="text-blue-600 hover:underline">
+                        Learn more about transliteration rules (external link)
+                    </a>
+                </p>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        const API_KEY = "";
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
-        const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`;
-        
+        // The API key is no longer a user input and is now handled automatically.
         const arabicTextarea = document.getElementById('arabicText');
         const translateEnglishBtn = document.getElementById('translateEnglishBtn');
         const translateHebrewBtn = document.getElementById('translateHebrewBtn');
@@ -181,6 +218,7 @@
         const enlargeBtn = document.getElementById('enlargeBtn');
         const delargeBtn = document.getElementById('delargeBtn');
         const readArabicBtn = document.getElementById('readArabicBtn');
+        const clearArabicTextBtn = document.getElementById('clearArabicTextBtn');
         const audioPlayerSection = document.getElementById('audioPlayerSection');
         const playPauseBtn = document.getElementById('playPauseBtn');
         const playIcon = document.getElementById('playIcon');
@@ -190,16 +228,25 @@
         const currentTimeSpan = document.getElementById('currentTime');
         const durationTimeSpan = document.getElementById('durationTime');
 
-        let currentFontSize = 24; // Initial font size in pixels
+        // New elements for transliteration
+        const transliterateBtn = document.getElementById('transliterateBtn');
+        const arabicTransliterationTextarea = document.getElementById('arabicTransliterationText');
+        const transliterationResultDiv = document.getElementById('transliterationResult');
+        const transliterationTitle = document.getElementById('transliterationTitle');
+        const transliterationMapDiv = document.getElementById('transliterationMap');
+
+        let currentFontSize = 24;
         const FONT_SIZE_INCREMENT = 2;
         const MIN_FONT_SIZE = 14;
         const MAX_FONT_SIZE = 36;
         let audio = null;
         
-        // Set the initial font size on the textarea
         arabicTextarea.style.fontSize = `${currentFontSize}px`;
 
         async function callGeminiApi(payload) {
+            const API_KEY = "";
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+            
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -225,17 +272,47 @@
             }
         }
 
+        // CORRECTED TRANSLITERATION MAP
+        const transliterationMap = {
+            'ا': 'א', 'ب': 'ב', 'ت': 'ת', 'ث': 'ת\'', 'ج': 'ג׳', 'ح': 'ח', 'خ': 'ח׳',
+            'د': 'ד', 'ذ': 'ד\'', 'ر': 'ר', 'ز': 'ז', 'س': 'ס', 'ش': 'ש', 'ص': 'צ',
+            'ض': 'צ\'', 'ط': 'ט', 'ظ': 'ט\'', 'ع': 'ע', 'غ': 'ע\'', 'ف': 'פ', 'ق': 'ק',
+            'ك': 'כ', 'ل': 'ל', 'م': 'מ', 'ن': 'נ', 'ه': 'ה', 'و': 'ו', 'ي': 'י',
+            'ء': 'א', 'ئ': 'א', 'ة': 'ה',
+        };
+
+        const transliterationFinalMap = {
+            'م': 'ם',
+            'ن': 'ן',
+            'ص': 'ץ',
+            'ف': 'ף',
+            'ك': 'ך'
+        };
+
+        function transliterateWord(arabicWord) {
+            let result = '';
+            const wordLength = arabicWord.length;
+            for (let i = 0; i < wordLength; i++) {
+                const char = arabicWord[i];
+                if (i === wordLength - 1 && transliterationFinalMap[char]) {
+                    result += transliterationFinalMap[char];
+                } else {
+                    result += transliterationMap[char] || char;
+                }
+            }
+            return result;
+        }
+
         async function translate(text, targetLanguage) {
+            
             loadingDiv.classList.remove('hidden');
             fullTranslationParagraph.textContent = '';
             wordByWordDiv.innerHTML = '<span class="text-gray-500 italic">Word-by-word translation will appear here.</span>';
 
-            // Reset direction attributes
             fullTranslationParagraph.classList.remove('text-right', 'text-left');
             wordByWordSection.setAttribute('dir', 'auto');
             wordByWordDiv.setAttribute('dir', 'auto');
             
-            // Set direction based on target language
             if (targetLanguage === 'Hebrew' || targetLanguage === 'Arabic') {
                 fullTranslationParagraph.classList.add('text-right');
                 wordByWordSection.setAttribute('dir', 'rtl');
@@ -252,14 +329,12 @@
             Arabic Text: ${text}`;
 
             try {
-                // Full translation
                 const fullPayload = {
                     contents: [{ parts: [{ text: fullTranslationPrompt }] }]
                 };
                 const fullTranslatedText = await callGeminiApi(fullPayload);
                 fullTranslationParagraph.textContent = fullTranslatedText;
 
-                // Word-by-word translation
                 const wordByWordPayload = {
                     contents: [{ parts: [{ text: wordByWordPrompt }] }],
                     generationConfig: {
@@ -280,13 +355,15 @@
                 const wordByWordResponse = await callGeminiApi(wordByWordPayload);
                 let wordTranslations = JSON.parse(wordByWordResponse);
 
-                wordByWordDiv.innerHTML = ''; // Clear previous content
+                wordByWordDiv.innerHTML = '';
                 wordTranslations.forEach(word => {
+                    const transliteratedWord = transliterateWord(word.arabicWord);
                     const span = document.createElement('span');
                     span.className = 'bg-gray-200 rounded-md px-2 py-1 flex flex-col text-center';
                     span.innerHTML = `
-                        <span class="text-sm font-bold">${word.arabicWord}</span>
-                        <span class="text-xs text-gray-600">${word.translatedWord}</span>
+                        <span class="text-sm font-bold" dir="rtl">${word.arabicWord}</span>
+                        <span class="text-xs text-gray-600" dir="ltr">${word.translatedWord}</span>
+                        <span class="text-xs text-blue-600 font-semibold" dir="rtl">(${transliteratedWord})</span>
                     `;
                     wordByWordDiv.appendChild(span);
                 });
@@ -319,12 +396,10 @@
             const buffer = new ArrayBuffer(44 + pcmData.byteLength);
             const view = new DataView(buffer);
 
-            // RIFF header
             writeString(view, 0, 'RIFF');
             view.setUint32(4, 36 + pcmData.byteLength, true);
             writeString(view, 8, 'WAVE');
 
-            // fmt chunk
             writeString(view, 12, 'fmt ');
             view.setUint32(16, 16, true);
             view.setUint16(20, 1, true);
@@ -334,11 +409,9 @@
             view.setUint16(32, blockAlign, true);
             view.setUint16(34, bitsPerSample, true);
 
-            // data chunk
             writeString(view, 36, 'data');
             view.setUint32(40, pcmData.byteLength, true);
 
-            // Write PCM data
             new Uint8Array(buffer, 44).set(new Uint8Array(pcmData));
 
             return new Blob([view], { type: 'audio/wav' });
@@ -350,7 +423,6 @@
             }
         }
 
-        // Helper to format time
         function formatTime(seconds) {
             const minutes = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
@@ -360,7 +432,6 @@
         copyTranslationBtn.addEventListener('click', () => {
             const textToCopy = fullTranslationParagraph.textContent;
             if (textToCopy && textToCopy !== "Your translation will appear here.") {
-                // Use a temporary textarea to hold the text for copying
                 const tempTextarea = document.createElement('textarea');
                 tempTextarea.value = textToCopy;
                 document.body.appendChild(tempTextarea);
@@ -368,7 +439,6 @@
                 document.execCommand('copy');
                 document.body.removeChild(tempTextarea);
 
-                // Provide feedback to the user
                 copyTranslationBtn.innerHTML = '<span>Copied</span>';
                 setTimeout(() => {
                     copyTranslationBtn.innerHTML = '<span>Copy</span>';
@@ -376,7 +446,6 @@
             }
         });
         
-        // New event listeners for font size controls
         enlargeBtn.addEventListener('click', () => {
             if (currentFontSize < MAX_FONT_SIZE) {
                 currentFontSize += FONT_SIZE_INCREMENT;
@@ -392,6 +461,8 @@
         });
 
         readArabicBtn.addEventListener('click', async () => {
+            const API_KEY = "";
+            const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`;
             const text = arabicTextarea.value.trim();
             if (!text) {
                 fullTranslationParagraph.textContent = "Please enter some Arabic text to read aloud.";
@@ -446,11 +517,8 @@
                     
                     audio = new Audio(audioUrl);
                     
-                    // Show audio player and start playback
                     audioPlayerSection.classList.remove('hidden');
-                    audio.play();
                     
-                    // Set up event listeners for the audio player
                     audio.addEventListener('loadedmetadata', () => {
                         durationTimeSpan.textContent = formatTime(audio.duration);
                     });
@@ -475,7 +543,7 @@
                         playIcon.classList.remove('hidden');
                         pauseIcon.classList.add('hidden');
                         audio.currentTime = 0;
-                        URL.revokeObjectURL(audioUrl); // Clean up the object URL
+                        URL.revokeObjectURL(audioUrl);
                     });
 
                     progressBar.addEventListener('click', (e) => {
@@ -507,6 +575,17 @@
             }
         });
 
+        clearArabicTextBtn.addEventListener('click', () => {
+            arabicTextarea.value = '';
+            fullTranslationParagraph.textContent = "Your translation will appear here.";
+            wordByWordDiv.innerHTML = '<span class="text-gray-500 italic">Word-by-word translation will appear here.</span>';
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+                audioPlayerSection.classList.add('hidden');
+            }
+        });
+
         translateEnglishBtn.addEventListener('click', () => {
             const text = arabicTextarea.value.trim();
             if (text) {
@@ -522,6 +601,119 @@
                 translate(text, 'Hebrew');
             } else {
                 fullTranslationParagraph.textContent = "Please enter some Arabic text to translate.";
+            }
+        });
+        
+        const detailedMap = {
+            'ا': 'א', 'ـا': 'א',
+            'ب': 'ב', 'بـ': 'ב', 'ـبـ': 'ב', 'ـב': 'ב',
+            'ت': 'ת', 'تـ': 'ת', 'ـتـ': 'ת', 'ـت': 'ת',
+            'ث': 'ת\'', 'ثـ': 'ת\'', 'ـثـ': 'ת\'', 'ـث': 'ת\'',
+            'ج': 'ג׳', 'جـ': 'ג׳', 'ـجـ': 'ג׳', 'ـج': 'ג׳',
+            'ح': 'ח', 'حـ': 'ח', 'ـحـ': 'ח', 'ـح': 'ח',
+            'خ': 'ח׳', 'خـ': 'ח׳', 'ـخـ': 'ח׳', 'ـخ': 'ח׳',
+            'د': 'ד', 'ـد': 'ד',
+            'ذ': 'ד\'', 'ـذ': 'ד\'',
+            'ر': 'ר', 'ـر': 'ר',
+            'ز': 'ז', 'ـز': 'ז',
+            'س': 'ס', 'سـ': 'ס', 'ـسـ': 'ס', 'ـס': 'ס',
+            'ش': 'ש', 'שـ': 'ש', 'ـשـ': 'ש', 'ـש': 'ש',
+            'ص': 'צ', 'صـ': 'צ', 'ـصـ': 'צ', 'ـص': 'צ',
+            'ض': 'צ\'', 'ضـ': 'צ\'', 'ـضـ': 'צ\'', 'ـض': 'צ\'',
+            'ط': 'ט', 'طـ': 'ט', 'ـطـ': 'ט', 'ـט': 'ט',
+            'ظ': 'ט\'', 'ظـ': 'ט\'', 'ـظـ': 'ט\'', 'ـظ': 'ט\'',
+            'ع': 'ע', 'عـ': 'ע', 'ـعـ': 'ע', 'ـع': 'ע',
+            'غ': 'ע\'', 'غـ': 'ע\'', 'ـغـ': 'ע\'', 'ـغ': 'ע\'',
+            'ف': 'פ', 'فـ': 'פ', 'ـفـ': 'פ', 'ـפ': 'פ',
+            'ق': 'ק', 'قـ': 'ק', 'ـقـ': 'ק', 'ـק': 'ק',
+            'ك': 'כ', 'كـ': 'כ', 'ـكـ': 'כ', 'ـכ': 'כ',
+            'ل': 'ל', 'لـ': 'ל', 'ـلـ': 'ל', 'ـל': 'ל',
+            'م': 'מ', 'مـ': 'מ', 'ـمـ': 'מ', 'ـמ': 'מ',
+            'ن': 'נ', 'نـ': 'נ', 'ـنـ': 'נ', 'ـנ': 'נ',
+            'ه': 'ה', 'هـ': 'ה', 'ـهـ': 'ה', 'ـه': 'ה',
+            'و': 'ו', 'ـو': 'ו',
+            'ي': 'י', 'يـ': 'י', 'ـيـ': 'י', 'ـי': 'י',
+        };
+
+        const transliterationFinalLetters = {
+            'م': 'ם',
+            'ن': 'ן',
+            'ص': 'ץ',
+            'ف': 'ף',
+            'ك': 'ך'
+        };
+
+        function transliterateText() {
+            const arabicText = arabicTransliterationTextarea.value.trim();
+            if (!arabicText) {
+                transliterationResultDiv.textContent = 'התעתיק יופיע כאן.';
+                return;
+            }
+
+            let result = '';
+            const words = arabicText.split(/\s+/);
+            words.forEach((word, index) => {
+                let tempWord = '';
+                for (let i = 0; i < word.length; i++) {
+                    const char = word[i];
+                    if (i === word.length - 1 && transliterationFinalLetters[char]) {
+                        tempWord += transliterationFinalLetters[char];
+                    } else {
+                        tempWord += transliterationMap[char] || char;
+                    }
+                }
+                result += tempWord;
+                if (index < words.length - 1) {
+                    result += ' ';
+                }
+            });
+            transliterationResultDiv.textContent = result;
+        }
+
+        function populateMap() {
+            const mapContainer = transliterationMapDiv.querySelector('div.grid');
+            mapContainer.innerHTML = '';
+            const mapData = `
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ا</span><span>א</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ب</span><span>ב</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ت</span><span>ת</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ث</span><span>ת'</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ج</span><span>ג׳</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ح</span><span>ח</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>خ</span><span>ח׳</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ד</span><span>ד</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ذ</span><span>ד'</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ر</span><span>ר</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ز</span><span>ז</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>س</span><span>ס</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ش</span><span>ש</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ص</span><span>צ</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ض</span><span>צ'</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ط</span><span>ט</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ظ</span><span>ט'</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ع</span><span>ע</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>غ</span><span>ע'</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ف</span><span>פ</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ق</span><span>ק</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ك</span><span>כ</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ل</span><span>ל</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>م</span><span>מ</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ن</span><span>נ</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ه</span><span>ה</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>و</span><span>ו</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ي</span><span>י</span></div>
+            `;
+            mapContainer.innerHTML = mapData;
+        }
+
+        transliterateBtn.addEventListener('click', transliterateText);
+
+        transliterationTitle.addEventListener('click', () => {
+            if (transliterationMapDiv.classList.contains('hidden')) {
+                populateMap();
+                transliterationMapDiv.classList.remove('hidden');
+            } else {
+                transliterationMapDiv.classList.add('hidden');
             }
         });
     </script>
