@@ -277,7 +277,7 @@
             'ا': 'א', 'ب': 'ב', 'ت': 'ת', 'ث': 'ת\'', 'ج': 'ג׳', 'ح': 'ח', 'خ': 'ח׳',
             'د': 'ד', 'ذ': 'ד\'', 'ر': 'ר', 'ز': 'ז', 'س': 'ס', 'ش': 'ש', 'ص': 'צ',
             'ض': 'צ\'', 'ط': 'ט', 'ظ': 'ט\'', 'ع': 'ע', 'غ': 'ע\'', 'ف': 'פ', 'ق': 'ק',
-            'ك': 'כ', 'ل': 'ל', 'م': 'מ', 'ن': 'נ', 'ه': 'ה', 'و': 'ו', 'ي': 'י',
+            'ك': 'כ', 'ل': 'ל', 'م': 'מ', 'ن': 'נ', 'ه': 'ה', 'و': 'ו', 'ي': 'י', 'ى': 'י',
             'ء': 'א', 'ئ': 'א', 'ة': 'ה',
         };
 
@@ -606,7 +606,7 @@
         
         const detailedMap = {
             'ا': 'א', 'ـا': 'א',
-            'ب': 'ב', 'بـ': 'ב', 'ـبـ': 'ב', 'ـב': 'ב',
+            'ب': 'ב', 'بـ': 'ב', 'ـبـ': 'ב', 'ـب': 'ב',
             'ت': 'ת', 'تـ': 'ת', 'ـتـ': 'ת', 'ـت': 'ת',
             'ث': 'ת\'', 'ثـ': 'ת\'', 'ـثـ': 'ת\'', 'ـث': 'ת\'',
             'ج': 'ג׳', 'جـ': 'ג׳', 'ـجـ': 'ג׳', 'ـج': 'ג׳',
@@ -616,23 +616,24 @@
             'ذ': 'ד\'', 'ـذ': 'ד\'',
             'ر': 'ר', 'ـر': 'ר',
             'ز': 'ז', 'ـز': 'ז',
-            'س': 'ס', 'سـ': 'ס', 'ـسـ': 'ס', 'ـס': 'ס',
+            'س': 'ס', 'سـ': 'ס', 'ـسـ': 'ס', 'ـس': 'ס',
             'ش': 'ש', 'שـ': 'ש', 'ـשـ': 'ש', 'ـש': 'ש',
             'ص': 'צ', 'صـ': 'צ', 'ـصـ': 'צ', 'ـص': 'צ',
             'ض': 'צ\'', 'ضـ': 'צ\'', 'ـضـ': 'צ\'', 'ـض': 'צ\'',
-            'ط': 'ט', 'طـ': 'ט', 'ـطـ': 'ט', 'ـט': 'ט',
+            'ط': 'ט', 'طـ': 'ט', 'ـطـ': 'ט', 'ـط': 'ט',
             'ظ': 'ט\'', 'ظـ': 'ט\'', 'ـظـ': 'ט\'', 'ـظ': 'ט\'',
             'ع': 'ע', 'عـ': 'ע', 'ـعـ': 'ע', 'ـع': 'ע',
             'غ': 'ע\'', 'غـ': 'ע\'', 'ـغـ': 'ע\'', 'ـغ': 'ע\'',
-            'ف': 'פ', 'فـ': 'פ', 'ـفـ': 'פ', 'ـפ': 'פ',
+            'ف': 'פ', 'פـ': 'פ', 'ـפـ': 'פ', 'ـפ': 'פ',
             'ق': 'ק', 'قـ': 'ק', 'ـقـ': 'ק', 'ـק': 'ק',
             'ك': 'כ', 'كـ': 'כ', 'ـكـ': 'כ', 'ـכ': 'כ',
-            'ل': 'ל', 'لـ': 'ל', 'ـلـ': 'ל', 'ـל': 'ל',
+            'ل': 'ל', 'لـ': 'ל', 'ـלـ': 'ל', 'ـל': 'ל',
             'م': 'מ', 'مـ': 'מ', 'ـمـ': 'מ', 'ـמ': 'מ',
             'ن': 'נ', 'نـ': 'נ', 'ـنـ': 'נ', 'ـנ': 'נ',
             'ه': 'ה', 'هـ': 'ה', 'ـهـ': 'ה', 'ـه': 'ה',
             'و': 'ו', 'ـو': 'ו',
-            'ي': 'י', 'يـ': 'י', 'ـيـ': 'י', 'ـי': 'י',
+            'ي': 'י', 'يـ': 'י', 'ـيـ': 'י', 'ـي': 'י',
+            'ى': 'י', 'ـى': 'י',
         };
 
         const transliterationFinalLetters = {
@@ -681,7 +682,7 @@
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ج</span><span>ג׳</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ح</span><span>ח</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>خ</span><span>ח׳</span></div>
-                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ד</span><span>ד</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>د</span><span>ד</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ذ</span><span>ד'</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ر</span><span>ר</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ز</span><span>ז</span></div>
@@ -702,6 +703,7 @@
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ه</span><span>ה</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>و</span><span>ו</span></div>
                 <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ي</span><span>י</span></div>
+                <div class="p-2 border border-gray-300 rounded-lg flex items-center justify-between"><span>ى</span><span>י</span></div>
             `;
             mapContainer.innerHTML = mapData;
         }
